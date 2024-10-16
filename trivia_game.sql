@@ -32,11 +32,28 @@ CREATE OR REPLACE PROCEDURE new_player(
     end;
 $$;
 
-CALL new_player('amirkle27', 'ItsAniceTrivia100', 'amirkle@gmail.com', 41);
-CALL new_player('guy', 'WhyDoINeedAPasswordForASimpleTriviaGame', 'guy@gmail.com', 39);
 
-SELECT * FROM players;
 
--- CALL new_player('amirkle27', 'AMIR', 'amirklei@gmail.com', 41);
--- CALL new_player('amirkle', 'ItsAniceTrivia100', 'amirklee@gmail.com', 41);
--- CALL new_player('amir', 'TRY', 'amirkle@gmail.com', 41);
+
+drop function log_new_player;
+
+CREATE OR REPLACE FUNCTION log_new_player()
+    RETURNS TRIGGER AS $$
+        begin
+            INSERT INTO new_player_log (player_id) VALUES (NEW.player_id);
+            RETURN NEW;
+        end;
+    $$ LANGUAGE plpgsql;
+
+drop TRIGGER IF EXISTS new_user_registration ON players;
+CREATE TRIGGER new_user_registration
+AFTER INSERT ON players
+FOR EACH ROW
+EXECUTE FUNCTION log_new_player();
+
+ALTER TABLE players DISABLE TRIGGER new_user_registration;
+SELECT setval('players_player_id_seq', (SELECT MAX(player_id) FROM players));
+DELETE FROM players;
+select * from players;
+select * from new_player_log;
+ALTER SEQUENCE players_player_id_seq RESTART WITH 1;
