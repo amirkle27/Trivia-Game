@@ -2,13 +2,14 @@ select count (*) from questions;
  select * from questions;
 
 
-drop procedure new_player;
+drop function new_player;
 
-CREATE OR REPLACE PROCEDURE new_player(
+CREATE OR REPLACE FUNCTION new_player(
         new_username VARCHAR(50),
-        new_password VARCHAR(100),
+        new_password TEXT,
         new_email VARCHAR(100),
-        new_age INTEGER
+        new_age INTEGER,
+        OUT player_id INTEGER
         )
     language plpgsql AS
     $$
@@ -26,7 +27,8 @@ CREATE OR REPLACE PROCEDURE new_player(
                 new_username,
                 new_password,
                 new_email,
-                new_age);
+                new_age)
+            RETURNING player_id into player_id;
         END IF;
 
     end;
@@ -55,5 +57,6 @@ ALTER TABLE players DISABLE TRIGGER new_user_registration;
 SELECT setval('players_player_id_seq', (SELECT MAX(player_id) FROM players));
 DELETE FROM players;
 select * from players;
+select * from player_answers;
 select * from new_player_log;
 ALTER SEQUENCE players_player_id_seq RESTART WITH 1;
