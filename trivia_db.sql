@@ -33,6 +33,11 @@ CREATE TABLE high_scores (
     achieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE new_player_log (
+    player_id INTEGER PRIMARY KEY REFERENCES players(player_id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 INSERT INTO questions (question_text,
                        answer_a,
                        answer_b,
