@@ -1,5 +1,7 @@
 import time
 import itertools
+from time import sleep
+
 import psycopg2
 import psycopg2.extras
 from pymongo import MongoClient
@@ -34,24 +36,30 @@ def insert_new_player(username, password, email, age):
     """Inserting a record for a new player in the PostgreSQL database upon registering"""
     try:
         hashed_password = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode('utf-8')
+
+        # Use SELECT to call the function and retrieve the OUT parameter
         new_player_query = """
-        CALL new_player(%s, %s, %s, %s);
+        SELECT * FROM new_player(%s, %s, %s, %s);
         """
 
-        # # Insert sample players
-        # insert_new_player('shimon', 'MeNashE', 'shimonmenashe@gmail.com', 47)
-        # insert_new_player('amirkle27', 'ItsAniceTrivia100', 'amirkle@gmail.com', 41)
-        # insert_new_player('guy', 'WhyDoINeedAPasswordForASimpleTriviaGame', 'guy@gmail.com', 39)
-
-
         pg_cursor.execute(new_player_query, (username, hashed_password, email, age))
-        player_id = pg_cursor.fetchone()['player_id']
-        connection.commit()
-        return player_id
+
+        result = pg_cursor.fetchone()
+        print(f"Fetch result: {result}")  # Debugging line to see the fetch result
+
+        if result:
+            player_id = result[0]  # This assumes the first element is the player_id (OUT parameter)
+            connection.commit()
+            return player_id
+        else:
+            print("No player ID was returned.")
+            return None
+
     except Exception as e:
         connection.rollback()
         print("An error occurred:", e)
         return None
+
 
 
 # Fetch and store 20 questions for a player in MongoDB
@@ -77,7 +85,8 @@ def fetch_and_store_questions(player_id, pg_cursor, mongo_collection):
             "answer_b": question['answer_b'],
             "answer_c": question['answer_c'],
             "answer_d": question['answer_d'],
-            "correct_answer": question['correct_answer']
+            "correct_answer": question['correct_answer'],
+
             }
             for question in questions
         ]
@@ -87,16 +96,55 @@ def fetch_and_store_questions(player_id, pg_cursor, mongo_collection):
     except Exception as e:
         print("An error occurred while fetching and storing questions:", e)
 
-    # Check and process new entries from new_player_log
-    while True:
-        pg_cursor.execute("SELECT * FROM new_player_log;")
-        new_entries = pg_cursor.fetchall()
+def start_quiz(player_id):
+    """Loops through the questions stored in MongoDB,
+     ask each one and delete it from the questions bank after receiving an answer """
 
-        for entry in new_entries:
-            player_id = entry['player_id']
-            fetch_and_store_questions(player_id, pg_cursor, player_questions_collection)
-            pg_cursor.execute("DELETE FROM new_player_log WHERE player_id = %s;", (player_id,))
-            connection.commit()
+
+    while True:
+        question = player_questions_collection.find_one({"player_id":player_id})
+
+        if not question:
+            print("You've answered all the questions! Well done!")
+            break;
+        else:
+            for i, color in zip(range(5), itertools.cycle(colors)):
+                text = f"{color}GET READY, STARTING THE QUIZ!{reset}"
+                print(f"\r{' '}\r{text.center(130)}", end="", flush=True)
+                time.sleep(2)
+
+
+                print("\n")
+                print(f"\n{question['question_text']}\033[0m\n")  # Reset color to white for the question text
+                sleep(2)
+                print(f"\033[95ma. {question['answer_a']}\033[0m", end='')  # Apply color for option a and reset after
+                sleep(1)
+                print(f"\033[92mb. {question['answer_b']:>30}\033[0m\n")  # Apply color for option b and reset after
+                sleep(1)
+                print(f"\033[93mc. {question['answer_c']}\033[0m", end='')  # Apply color for option c and reset after
+                sleep(1)
+                print(f"\033[94md. {question['answer_d']:>30}\033[0m\n")  # Apply color for option d and reset after
+                (sleep(1))
+                answer = input(f"Please enter your answer:\nIs it \033[95m(a)\033[0m, \033[92m(b)\033[0m, \033[93m(c)\033[0m, or \033[94m(d)\033[0m? \n").lower()
+
+                if answer == question['correct_answer']:
+                    print("Correct Answer!")
+                else:
+                    print(f"Wrong Answer... Too Bad...\nThe Correct Answer was: {question['correct_answer']}.")
+                player_questions_collection.delete_one({"_id": question['_id']})
+
+
+
+    # Check and process new entries from new_player_log
+    # while True:
+    #     pg_cursor.execute("SELECT * FROM new_player_log;")
+    #     new_entries = pg_cursor.fetchall()
+    #
+    #     for entry in new_entries:
+    #         player_id = entry['player_id']
+    #         fetch_and_store_questions(player_id, pg_cursor, player_questions_collection)
+    #         pg_cursor.execute("DELETE FROM new_player_log WHERE player_id = %s;", (player_id,))
+    #         connection.commit()
 
 
 # finally:
@@ -174,7 +222,8 @@ def main_menu():
                 player_id = insert_new_player(username, password, email, age)
                 if player_id:
                     print(f"Player {username} created successfully with ID:\n{player_id} ")
-                    fetch_and_store_questions({player_id}, pg_cursor, player_questions_collection)
+                    fetch_and_store_questions(player_id, pg_cursor, player_questions_collection)
+                    start_quiz(player_id)
                 else:
                     print("Failed to create player. Please try again.")
             else:
