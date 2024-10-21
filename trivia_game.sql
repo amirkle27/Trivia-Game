@@ -36,12 +36,6 @@ BEGIN
 END;
 $$;
 
-
-
-
-
-
-
 drop function log_new_player;
 
 CREATE OR REPLACE FUNCTION log_new_player()
@@ -57,6 +51,32 @@ CREATE TRIGGER new_user_registration
 AFTER INSERT ON players
 FOR EACH ROW
 EXECUTE FUNCTION log_new_player();
+
+
+drop procedure update_player_answers;
+
+CREATE OR REPLACE PROCEDURE update_player_answers(
+    IN p_player_id INTEGER,
+    IN p_question_id INTEGER,
+    IN p_selected_answer CHAR(1),
+    IN p_is_correct BOOLEAN)
+language plpgsql AS
+    $$
+    begin
+        UPDATE player_answers
+        SET player_id=p_player_id,
+            question_id=p_question_id,
+            selected_answer=p_selected_answer,
+            is_correct=p_is_correct
+        WHERE player_id=p_player_id AND question_id=p_question_id;
+    end;
+$$;
+
+
+UPDATE player_answers
+SET player_id = %s, question_id = %s, selected_answer = %s, is_correct = %s
+WHERE player_id = %s and question_id = %s
+
 
 
 SELECT setval('players_player_id_seq', (SELECT MAX(player_id) FROM players));
