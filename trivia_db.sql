@@ -156,3 +156,6 @@ INSERT INTO questions (question_text,
                         ('What is the capital of South Korea?','Seoul','Pyongyang','Tokyo','Busan','a'),
                         ('Which is the fastest land animal?','Cheetah','Lion','Horse','Gazelle','a'),
                         ('Who was the last queen of France?','Marie Antoinette','Catherine de Medici','Joan of Arc','Anne of Austria','a')
+
+INSERT INTO player_answers(player_id, question_id)
+VALUES (p_player_id,p_question_id);
