@@ -33,6 +33,13 @@ CREATE TABLE high_scores (
     achieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE high_scores
+ADD COLUMN started_at TIMESTAMP DEFAULT NULL,
+ADD COLUMN finished_at TIMESTAMP DEFAULT NULL,
+ADD COLUMN total_game_time TIMESTAMP NULL,
+DROP COLUMN achieved_at;
+
+
 CREATE TABLE new_player_log (
     player_id INTEGER PRIMARY KEY REFERENCES players(player_id) ON DELETE CASCADE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -157,5 +164,3 @@ INSERT INTO questions (question_text,
                         ('Which is the fastest land animal?','Cheetah','Lion','Horse','Gazelle','a'),
                         ('Who was the last queen of France?','Marie Antoinette','Catherine de Medici','Joan of Arc','Anne of Austria','a')
 
-INSERT INTO player_answers(player_id, question_id)
-VALUES (p_player_id,p_question_id);
