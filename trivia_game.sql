@@ -58,24 +58,55 @@ drop procedure update_player_answers;
 CREATE OR REPLACE PROCEDURE update_player_answers(
     IN p_player_id INTEGER,
     IN p_question_id INTEGER,
-    IN p_selected_answer CHAR(1),
-    IN p_is_correct BOOLEAN)
+    IN p_selected_answer CHAR(1))
 language plpgsql AS
     $$
     begin
-        UPDATE player_answers
-        SET player_id=p_player_id,
-            question_id=p_question_id,
-            selected_answer=p_selected_answer,
-            is_correct=p_is_correct
-        WHERE player_id=p_player_id AND question_id=p_question_id;
+        DECLARE
+            v_is_correct BOOLEAN;
+        BEGIN
+            SELECT CASE
+                WHEN q.correct_answer = p_selected_answer THEN TRUE
+                ELSE FALSE
+            END
+            INTO v_is_correct
+            FROM questions q
+            WHERE q.question_id = p_question_id;
+
+            INSERT INTO player_answers(player_id, question_id, selected_answer, is_correct)
+            VALUES (p_player_id,p_question_id,p_selected_answer,v_is_correct)
+            ON CONFLICT (player_id,question_id)
+            DO UPDATE
+            SET selected_answer = EXCLUDED.is_correct;
+
+            UPDATE players
+            SET questions_solved=questions_solved+1
+            WHERE player_id=p_player_id;
+        END;
     end;
+
 $$;
 
+drop procedure update_high_score_table;
 
-UPDATE player_answers
-SET player_id = %s, question_id = %s, selected_answer = %s, is_correct = %s
-WHERE player_id = %s and question_id = %s
+CREATE OR REPLACE procedure update_high_score_table(
+    IN p_player_id INTEGER)
+language plpgsql AS
+    $$
+    DECLARE v_correct_answer INTEGER;
+        begin
+            SELECT COUNT (*)
+            INTO v_correct_answer
+            FROM player_answers
+            WHERE player_id = p_player_id AND is_correct = TRUE;
+
+            IF v_correct_answer > 5 THEN
+                INSERT INTO high_scores (player_id, score_id, finished_at)
+                VALUES (p_player_id, v_correct_answer, CURRENT_TIMESTAMP);
+            END IF;
+        end;
+    $$;
+
 
 
 
