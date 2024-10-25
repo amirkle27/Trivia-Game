@@ -75,29 +75,26 @@ def insert_new_player(username, password, email, age):
 
 # Fetch and store 20 questions for a player in MongoDB
 def fetch_and_store_questions(player_id, pg_cursor, mongo_collection):
-    """Fetching 20 random questions generated in postgreSQL and storing them at the mongoDB question bank
-     for later use"""
+    """Fetching 20 random questions generated in postgreSQL and storing them at the MongoDB question bank
+     for later use."""
     try:
-        questions_query = """
-            SELECT question_id, question_text, answer_a, answer_b, answer_c, answer_d, correct_answer
-            FROM questions
-            ORDER BY RANDOM()
-            LIMIT 20;
-            """
-        pg_cursor.execute(questions_query)
+        # Clear any existing questions for the player
+        mongo_collection.delete_many({"player_id": player_id})
+        # Call the new PostgreSQL function to fetch 20 random questions
+        pg_cursor.execute("SELECT * FROM get_random_questions();")
         questions = pg_cursor.fetchall()
 
+        # Store questions in MongoDB
         questions_to_store = [
             {
-            "player_id": player_id,
-            "question_id": question['question_id'],
-            "question_text": question['question_text'],
-            "answer_a": question['answer_a'],
-            "answer_b": question['answer_b'],
-            "answer_c": question['answer_c'],
-            "answer_d": question['answer_d'],
-            "correct_answer": question['correct_answer'],
-
+                "player_id": player_id,
+                "question_id": question['question_id'],
+                "question_text": question['question_text'],
+                "answer_a": question['answer_a'],
+                "answer_b": question['answer_b'],
+                "answer_c": question['answer_c'],
+                "answer_d": question['answer_d'],
+                "correct_answer": question['correct_answer'],
             }
             for question in questions
         ]
@@ -106,6 +103,7 @@ def fetch_and_store_questions(player_id, pg_cursor, mongo_collection):
         print(f"Questions stored in MongoDB for player_id: {player_id}")
     except Exception as e:
         print("An error occurred while fetching and storing questions:", e)
+
 
 def update_player_answer (player_id,question_id,selected_answer):
     """Sends the player and question/answer info back to PostgreSQL to store in the player_answers table for later statistics use"""
@@ -119,10 +117,12 @@ def update_player_answer (player_id,question_id,selected_answer):
 
 
 
-def start_quiz(player_id, question_id, selected_answer):
+def start_quiz(player_id):
     """Loops through the questions stored in MongoDB,
      ask each one and delete it from the questions bank after receiving an answer """
-
+    query = "CALL update_high_score_table_start_time(%s);"
+    pg_cursor.execute(query,(player_id,))
+    connection.commit()
     for i, color in zip(range(5), itertools.cycle(colors)):
         text = f"{color}GET READY, STARTING THE QUIZ!{reset}"
         print(f"\r{' '}\r{text.center(140)}", end="", flush=True)
@@ -132,9 +132,12 @@ def start_quiz(player_id, question_id, selected_answer):
 
         if not question:
             print("You've answered all the questions! Well done!")
-            break;
+            query = "CALL update_high_score_table_finish_time(%s);"
+            pg_cursor.execute(query, (player_id,))
+            connection.commit()
+            return main_menu()
         else:
-
+            question_id = question['question_id']
             print("\n")
             print(f"{' ':<50}{question['question_text']}\033[0m\n")  # Reset color to white for the question text
             sleep(2)
@@ -146,14 +149,23 @@ def start_quiz(player_id, question_id, selected_answer):
             sleep(1)
             print(f"\033[94m{'d.' + question['answer_d']}\033[0m\n")
             (sleep(1))
-            answer = input(
+            selected_answer = input(
                 f"Please enter your answer:\nIs it \033[95m(a)\033[0m, \033[92m(b)\033[0m, \033[93m(c)\033[0m, or \033[94m(d)\033[0m? \n").lower()
+
             update_player_answer(player_id, question_id, selected_answer)
-            if answer == question['correct_answer']:
+            delete = player_questions_collection.delete_one({"_id": question['_id']})
+            # Call this function after each answer is processed and the question is deleted
+            print_remaining_questions(player_id)
+
+            if delete.deleted_count == 1:
+                print(f"Question {question['_id']} deleted successfully.")
+            else:
+                print(f"Failed to delete question {question['_id']}.")
+
+            if selected_answer == question['correct_answer']:
                 print("Correct Answer!")
             else:
                 print(f"Wrong Answer... Too Bad...\nThe Correct Answer was: {question['correct_answer']}.")
-            player_questions_collection.delete_one({"_id": question['_id']})
 
 def update_highscore (player_id):
     query = "CALL update_high_score_table(%s)"
@@ -275,6 +287,15 @@ def main_menu():
         case 'q':
             print("Sorry to see you leave. Goodbye.")
             exit()
+
+
+def print_remaining_questions(player_id):
+    remaining_questions = player_questions_collection.find({"player_id": player_id})
+    print("\nRemaining questions:")
+    for question in remaining_questions:
+        print(f"Question: {question['question_text']}, Correct Answer: {question['correct_answer']}")
+
+
 
 
 
