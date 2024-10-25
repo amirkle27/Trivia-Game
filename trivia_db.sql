@@ -26,18 +26,20 @@ CREATE TABLE player_answers (
     PRIMARY KEY (player_id, question_id) -- Composite primary key
 );
 
-
+--   drop table high_scores
 CREATE TABLE high_scores (
-    score_id INTEGER PRIMARY KEY CHECK (score_id >= 1 AND score_id <= 20), -- representing scores from 1 to 20
     player_id INTEGER REFERENCES players(player_id) ON DELETE CASCADE,
+    score_id  SERIAL PRIMARY KEY, -- representing scores from 1 to 20
     achieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 ALTER TABLE high_scores
 ADD COLUMN started_at TIMESTAMP DEFAULT NULL,
 ADD COLUMN finished_at TIMESTAMP DEFAULT NULL,
-ADD COLUMN total_game_time TIMESTAMP NULL,
+ADD COLUMN total_game_time INTERVAL NULL,
+ADD COLUMN score integer DEFAULT 0,
 DROP COLUMN achieved_at;
+CREATE INDEX ON high_scores (score DESC);
 
 
 CREATE TABLE new_player_log (
