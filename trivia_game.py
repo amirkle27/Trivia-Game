@@ -98,12 +98,37 @@ def fetch_and_store_questions(player_id, pg_cursor, mongo_collection):
             }
             for question in questions
         ]
-
         mongo_collection.insert_many(questions_to_store)
         print(f"Questions stored in MongoDB for player_id: {player_id}")
     except Exception as e:
         print("An error occurred while fetching and storing questions:", e)
 
+
+def verify_player (username,password):
+    """Verify if a returning player exists in PostgreSQL with an unfinished game."""
+    try:
+        pg_cursor.execute("SELECT player_id, password FROM players WHERE username = %s", (username,))
+        result = pg_cursor.fetchone()
+        if result and bcrypt.checkpw(password.encode(), result['password'].encode()):
+            print(f"Welcome back, {username}!")
+            player_id = result['player_id']
+            # Check if the game is unfinished by counting answers
+            pg_cursor.execute("SELECT COUNT(*) FROM player_answers WHERE player_id = %s", (player_id,))
+            questions_answered = pg_cursor.fetchone()[0]
+
+            unfinished_game = questions_answered < 20
+            return player_id, unfinished_game
+        else:
+            print("Invalid login or finished game.")
+            return None, False
+    except Exception as e:
+        print("Error verifying player:", e)
+        return None, False
+
+def fetch_remaining_questions (player_id, mongo_collection):
+    """Fetch the remaining questions for a returning player from MongoDB."""
+    remaining_questions = mongo_collection.find ({"player_id":player_id})
+    return list(remaining_questions)
 
 def update_player_answer (player_id,question_id,selected_answer):
     """Sends the player and question/answer info back to PostgreSQL to store in the player_answers table for later statistics use"""
@@ -149,13 +174,13 @@ def start_quiz(player_id):
             sleep(1)
             print(f"\033[94m{'d.' + question['answer_d']}\033[0m\n")
             (sleep(1))
-            selected_answer = input(
-                f"Please enter your answer:\nIs it \033[95m(a)\033[0m, \033[92m(b)\033[0m, \033[93m(c)\033[0m, or \033[94m(d)\033[0m? \n").lower()
-
-            update_player_answer(player_id, question_id, selected_answer)
-            delete = player_questions_collection.delete_one({"_id": question['_id']})
-            # Call this function after each answer is processed and the question is deleted
-            print_remaining_questions(player_id)
+            selected_answer = check_to_quit(input(
+                f"Please enter your answer:\nIs it \033[95m(a)\033[0m, \033[92m(b)\033[0m, \033[93m(c)\033[0m, or \033[94m(d)\033[0m? \n\033[96mRemember you can hit [Q] at any time to quit!\033[0m\n").lower())
+            if not selected_answer == 'q':
+                update_player_answer(player_id, question_id, selected_answer)
+                delete = player_questions_collection.delete_one({"_id": question['_id']})
+                # Call this function after each answer is processed and the question is deleted
+                print_remaining_questions(player_id)
 
             if delete.deleted_count == 1:
                 print(f"Question {question['_id']} deleted successfully.")
@@ -266,8 +291,6 @@ def main_menu():
                         return main_menu()
                     else:
                         continue
-
-
                 if password == reenter_password:
                     player_id = insert_new_player(username, password, email, age)
                     if player_id:
@@ -281,7 +304,23 @@ def main_menu():
                 #     print("Passwords do not match. Please try again.")
                 #     main_menu()
         case 'e':
-            print("HAVENT WRITTEN THIS BIT FOR EXISTING PLAYER!")
+            username = check_to_quit(input("Please enter a username: \n"))
+            password = check_to_quit(input("Please enter a password: \n"))
+            player_id, unfinished_game = verify_player(username,password)
+            if player_id:
+                if unfinished_game:
+                    questions = fetch_remaining_questions(player_id, player_questions_collection)
+                    start_quiz(player_id)
+                else:
+                    print("It looks like you've completed the quiz. Let's start a new game!")
+                    fetch_remaining_questions(player_id,pg_cursor,player_questions_collection)
+                    start_quiz(player_id)
+            else:
+                print("Invalid login or finished game. Please try again")
+
+
+
+
         case 's':
             print("HAVENT WRITTEN THIS BIT FOR STATISTICS!")
         case 'q':
