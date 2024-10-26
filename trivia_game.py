@@ -1,3 +1,30 @@
+
+
+# pip install matplotlib !!!
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Data
+labels = ['Correct', 'Wrong', 'Not Answered']
+sizes = [25, 35, 20]
+colors = ['yellowgreen', 'red', 'gold']
+explode = (0.1, 0, 0)  # To "explode" the first slice
+
+# Create a pie chart
+fig, ax = plt.subplots()
+ax.pie(sizes, explode=explode, labels=labels, colors=colors, autopct='%1.1f%%',
+       shadow=True, startangle=90)
+
+# Equal aspect ratio ensures that the pie chart is drawn as a circle.
+ax.axis('equal')
+
+# Add a headline
+ax.set_title("Distribution of Answers")
+
+# Show the plot
+plt.show()
+##############################################
 import time
 import itertools
 from time import sleep
@@ -175,7 +202,7 @@ def start_quiz(player_id):
             print(f"\033[94m{'d.' + question['answer_d']}\033[0m\n")
             (sleep(1))
             selected_answer = check_to_quit(input(
-                f"Please enter your answer:\nIs it \033[95m(a)\033[0m, \033[92m(b)\033[0m, \033[93m(c)\033[0m, or \033[94m(d)\033[0m? \n\033[96mRemember you can hit [Q] at any time to quit!\033[0m\n").lower())
+                f"Please enter your answer:\nIs it \033[95m(a)\033[0m, \033[92m(b)\033[0m, \033[93m(c)\033[0m, or \033[94m(d)\033[0m? \n\033[96mRemember you can hit [Q] at any time to quit!\033[0m\n").lower(), player_id)
             if not selected_answer == 'q':
                 update_player_answer(player_id, question_id, selected_answer)
                 delete = player_questions_collection.delete_one({"_id": question['_id']})
@@ -254,12 +281,23 @@ def update_highscore (player_id):
 # pg_cursor.close()
 # connection.close()
 
-def check_to_quit(user_input):
+def check_to_quit(user_input, player_id = None):
     if user_input == 'q':
+        if player_id:
+            quit_game(player_id)
+
         return main_menu()
     return user_input
 
+def quit_game (player_id):
+    pg_cursor.execute("CALL update_session_time(%s);", (player_id,))
+    connection.commit()
+    print("Game session saved. You can resume later at any time")
 
+def complete_game(player_id):
+    pg_cursor.execute("CALL update_high_score_table_finish_time(%s);", (player_id,))
+    connection.commit()
+    print("Congratulations! Game completed!")
 def main_menu():
     print("Hello, and welcome to:".center(130, " "))  # Manually set the center width to 120
     time.sleep(2)
@@ -312,6 +350,7 @@ def main_menu():
                     questions = fetch_remaining_questions(player_id, player_questions_collection)
                     start_quiz(player_id)
                 else:
+                    complete_game(player_id)
                     print("It looks like you've completed the quiz. Let's start a new game!")
                     fetch_remaining_questions(player_id,pg_cursor,player_questions_collection)
                     start_quiz(player_id)
