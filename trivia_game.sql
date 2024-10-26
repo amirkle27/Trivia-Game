@@ -76,6 +76,43 @@ language plpgsql AS
     $$;
 
 
+drop function retrieve_existing_player;
+
+CREATE OR REPLACE FUNCTION retrieve_existing_player(
+    IN p_username VARCHAR,
+    IN p_password VARCHAR,
+    OUT player_exists BOOLEAN,
+    OUT player_id INTEGER,
+    OUT unfinished_game BOOLEAN)
+language plpgsql AS
+    $$
+    DECLARE
+        v_password TEXT;
+        v_player_id INTEGER;
+        v_questions_answered INTEGER;
+    begin
+        SELECT p.player_id, p.password
+        INTO v_player_id, v_password
+        FROM players p
+        WHERE p.username = p_username;
+
+        IF v_player_id IS NOT NULL AND v_password = p_password THEN
+            player_exists := TRUE;
+            player_id := v_player_id;
+
+            SELECT COUNT (*)
+            INTO v_questions_answered
+            FROM player_answers pa
+            WHERE pa.player_id = v_player_id;
+
+            unfinished_game := v_questions_answered < 20;
+        ELSE
+            player_exists := FALSE;
+            unfinished_game := FALSE;
+
+        end if;
+    end;
+        $$;
 
 drop procedure update_player_answers;
 
