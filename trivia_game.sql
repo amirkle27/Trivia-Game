@@ -189,6 +189,32 @@ language plpgsql AS
         end;
     $$;
 
+
+drop procedure update_session_time;
+
+CREATE OR REPLACE PROCEDURE update_session_time(
+    IN p_player_id INTEGER)
+language plpgsql AS
+    $$
+    DECLARE
+        v_current_session_time INTERVAL;
+    begin
+            -- Calculate the current session time by subtracting `started_at` from the current time
+        v_current_session_time := CURRENT_TIMESTAMP -
+                                    (SELECT COALESCE(started_at, CURRENT_TIMESTAMP)
+                                     FROM high_scores
+                                     WHERE player_id = p_player_id
+                                     ORDER BY score_id
+                                     DESC LIMIT 1);
+        UPDATE high_scores
+        SET session_duration = v_current_session_time,
+            total_game_time = COALESCE(total_game_time, INTERVAL '0')+ v_current_session_time
+        WHERE player_id = p_player_id
+        AND finished_at IS NULL;
+    end;
+     $$;
+
+
 drop function maintain_top_20_scores;
 
 CREATE OR REPLACE FUNCTION maintain_top_20_scores()
