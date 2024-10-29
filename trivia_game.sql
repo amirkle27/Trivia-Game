@@ -239,6 +239,84 @@ AFTER INSERT ON high_scores
 FOR EACH ROW
 EXECUTE FUNCTION maintain_top_20_scores();
 
+drop function show_user_statistics;
+
+CREATE OR REPLACE FUNCTION show_user_statistics(
+    IN p_player_id INTEGER)
+    RETURNS TABLE (
+        player_id INTEGER,
+        username VARCHAR(50),
+        questions_solved INTEGER,
+        started_at TIMESTAMP,
+        finished_at TIMESTAMP,
+        total_game_time INTERVAL,
+        score INTEGER)
+    language plpgsql AS
+    $$
+    begin
+        RETURN QUERY
+                SELECT hs.player_id, p.username, p.questions_solved, hs.started_at, hs.finished_at, hs.total_game_time, hs.score
+                FROM high_scores hs
+                JOIN players p
+                ON hs.player_id = p.player_id
+                WHERE hs.player_id=p_player_id;
+    end;
+    $$;
+
+
+drop function show_user_best_score;
+
+CREATE OR REPLACE FUNCTION show_user_best_score(
+    IN p_player_id INTEGER
+)
+RETURNS TABLE (
+    player_id INT,
+    username VARCHAR,
+    questions_solved INT,
+    started_at TIMESTAMP,
+    finished_at TIMESTAMP,
+    total_game_time INTERVAL,
+    score INTEGER)
+    language plpgsql AS
+$$
+begin
+    RETURN QUERY
+    SELECT hs.player_id, p.username, p.questions_solved, hs.started_at, hs.finished_at, hs.total_game_time, hs.score
+    FROM high_scores hs
+    JOIN players p ON hs.player_id = p.player_id
+    WHERE hs.player_id = p_player_id
+    ORDER BY hs.score DESC
+    LIMIT 1;
+end;
+$$;
+
+
+
+drop function show_high_score_table;
+
+CREATE OR REPLACE FUNCTION show_high_score_table()
+    RETURNS TABLE (
+        player_id INTEGER,
+        username VARCHAR(50),
+        questions_solved INTEGER,
+        started_at TIMESTAMP,
+        finished_at TIMESTAMP,
+        total_game_time INTERVAL,
+        score integer)
+    language plpgsql AS
+    $$
+    begin
+        RETURN QUERY
+                SELECT hs.player_id, p.username, p.questions_solved, hs.started_at, hs.finished_at, hs.total_game_time, hs.score
+                FROM high_scores hs
+                JOIN players p
+                ON hs.player_id = p.player_id;
+    end;
+$$;
+
+
+
+
 SELECT setval('players_player_id_seq', (SELECT MAX(player_id) FROM players));
 DELETE FROM players;
 select * from players;
