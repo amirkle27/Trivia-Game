@@ -1,29 +1,29 @@
-
-
-# pip install matplotlib !!!
-
-import matplotlib.pyplot as plt
-import numpy as np
-
-# Data
-labels = ['Correct', 'Wrong', 'Not Answered']
-sizes = [25, 35, 20]
-colors = ['yellowgreen', 'red', 'gold']
-explode = (0.1, 0, 0)  # To "explode" the first slice
-
-# Create a pie chart
-fig, ax = plt.subplots()
-ax.pie(sizes, explode=explode, labels=labels, colors=colors, autopct='%1.1f%%',
-       shadow=True, startangle=90)
-
-# Equal aspect ratio ensures that the pie chart is drawn as a circle.
-ax.axis('equal')
-
-# Add a headline
-ax.set_title("Distribution of Answers")
-
-# Show the plot
-plt.show()
+#
+#
+# # pip install matplotlib !!!
+#
+# import matplotlib.pyplot as plt
+# import numpy as np
+#
+# # Data
+# labels = ['Correct', 'Wrong', 'Not Answered']
+# sizes = [25, 35, 20]
+# colors = ['yellowgreen', 'red', 'gold']
+# explode = (0.1, 0, 0)  # To "explode" the first slice
+#
+# # Create a pie chart
+# fig, ax = plt.subplots()
+# ax.pie(sizes, explode=explode, labels=labels, colors=colors, autopct='%1.1f%%',
+#        shadow=True, startangle=90)
+#
+# # Equal aspect ratio ensures that the pie chart is drawn as a circle.
+# ax.axis('equal')
+#
+# # Add a headline
+# ax.set_title("Distribution of Answers")
+#
+# # Show the plot
+# plt.show()
 ##############################################
 import time
 import itertools
@@ -137,7 +137,7 @@ def verify_player (username,password):
         pg_cursor.execute("SELECT player_id, password FROM players WHERE username = %s", (username,))
         result = pg_cursor.fetchone()
         if result and bcrypt.checkpw(password.encode(), result['password'].encode()):
-            print(f"Welcome back, {username}!")
+
             player_id = result['player_id']
             # Check if the game is unfinished by counting answers
             pg_cursor.execute("SELECT COUNT(*) FROM player_answers WHERE player_id = %s", (player_id,))
@@ -280,6 +280,60 @@ def update_highscore (player_id):
 # # Close connection
 # pg_cursor.close()
 # connection.close()
+def print_statistics_table(results):
+    headers = ["Player ID", "Username", "Questions Solved", "Started At", "Finished At", "Total Game Time", "Score"]
+
+    print(f"| {' | '.join(f'{header:^20}' for header in headers)} | ")
+    print("|" + "|".join("-" * 22 for _ in headers) + "|")
+
+    for row in results:
+        started_at = f"{row['started_at']:%Y-%m-%d %H:%M:%S}" if row.get('started_at') else "N/A"
+        finished_at = f"{row['finished_at']:%Y-%m-%d %H:%M:%S}" if row.get('finished_at') else "N/A"
+        total_game_time = str(row['total_game_time']).split('.')[0] if row.get('total_game_time') else "N/A"
+
+        print(f"| {row['player_id']:^20} | {row['username']:^20} | {row['questions_solved']:^20} | "
+              f"{started_at:^20} | {finished_at:^20} | {total_game_time:^20} | {row['score']:^20} |")
+
+def get_user_statistics(player_id):
+    """Retrieves and shows the user's personal statistics from all games in the 'high_score' table"""
+    pg_cursor.execute("SELECT * FROM show_user_statistics(%s);", (player_id,))
+    connection.commit()
+    results = pg_cursor.fetchall()
+    print_statistics_table(results)
+    sleep(5)
+    return main_menu()
+
+
+
+def get_user_best_score(player_id):
+    """Retrieves and shows the user's personal best from all games"""
+    pg_cursor.execute("SELECT * FROM show_user_best_score(%s);", (player_id,))
+    result = pg_cursor.fetchone()  # Fetches only one row
+
+    if result:
+        print_statistics_table([result])  # Pass a list containing the single row to match expected format
+    else:
+        print("No best score found for this player.")
+    sleep(5)
+    return main_menu()
+
+
+
+
+
+def show_statistics():
+    """Shows the 'high_score' table"""
+    pg_cursor.execute("SELECT * FROM show_high_score_table();")
+    connection.commit()
+    results = pg_cursor.fetchall()
+    print_statistics_table(results)
+
+
+
+
+    sleep(5)
+    return main_menu()
+
 
 def check_to_quit(user_input, player_id = None):
     if user_input == 'q':
@@ -346,6 +400,7 @@ def main_menu():
             password = check_to_quit(input("Please enter a password: \n"))
             player_id, unfinished_game = verify_player(username,password)
             if player_id:
+                print(f"Welcome back, {username}!")
                 if unfinished_game:
                     questions = fetch_remaining_questions(player_id, player_questions_collection)
                     start_quiz(player_id)
@@ -356,12 +411,24 @@ def main_menu():
                     start_quiz(player_id)
             else:
                 print("Invalid login or finished game. Please try again")
-
-
-
-
         case 's':
-            print("HAVENT WRITTEN THIS BIT FOR STATISTICS!")
+            user_input = input(f"Would you like to:\n1. See Your overall Statistics\n2. See Your best performance yet\
+            \n3. See all time best scores\n 4. Quit ")
+            if user_input == '1':
+                username = check_to_quit(input("Please enter a username: \n"))
+                password = check_to_quit(input("Please enter a password: \n"))
+                player_id = verify_player(username, password)
+                get_user_statistics(player_id[0])
+            elif user_input == '2':
+                username = check_to_quit(input("Please enter a username: \n"))
+                password = check_to_quit(input("Please enter a password: \n"))
+                player_id = verify_player(username, password)
+                get_user_best_score(player_id[0])
+            elif user_input == '3':
+                show_statistics()
+            elif user_input == '4' or user_input == 'q':
+                user_input= 'q'
+                check_to_quit(user_input)
         case 'q':
             print("Sorry to see you leave. Goodbye.")
             exit()
