@@ -12,7 +12,7 @@ CREATE TABLE questions (
 CREATE TABLE players (
     player_id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
-    password VARCHAR(100) NOT NULL,  -- better to encrypt
+    password VARCHAR(100) NOT NULL, 
     email VARCHAR(100) UNIQUE NOT NULL,
     age INTEGER NOT NULL,
     questions_solved INTEGER DEFAULT 0
@@ -23,13 +23,12 @@ CREATE TABLE player_answers (
     question_id INTEGER REFERENCES questions(question_id) ON DELETE CASCADE,
     selected_answer CHAR(1) CHECK (selected_answer IN ('a', 'b', 'c', 'd')) NOT NULL,
     is_correct BOOLEAN NOT NULL,
-    PRIMARY KEY (player_id, question_id) -- Composite primary key
+    PRIMARY KEY (player_id, question_id) 
 );
 
---   drop table high_scores
 CREATE TABLE high_scores (
     player_id INTEGER REFERENCES players(player_id) ON DELETE CASCADE,
-    score_id  SERIAL PRIMARY KEY, -- representing scores from 1 to 20
+    score_id  SERIAL PRIMARY KEY, 
     achieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
